@@ -1,10 +1,17 @@
 package file
 
-import "os"
+import (
+	"mime/multipart"
+
+	"github.com/google/uuid"
+)
 
 type File struct {
-	ID       uint64
-	Filename string
-	Size     uint64
-	File     *os.File
+	ID          uuid.UUID
+	Filename    string
+	Size        int64
+	File        multipart.File
+	ContentType string
+	Status      string
+	URL         string
 }

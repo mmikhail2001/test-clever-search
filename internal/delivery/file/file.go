@@ -1,44 +1,82 @@
 package file
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
+
+	"github.com/mmikhail2001/test-clever-search/internal/domain/file"
 )
 
 type Handler struct {
+	usecase Usecase
 }
 
-func (h *Handler) uploadHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseMultipartForm(10 << 20) // Максимальный размер файла 10MB
+func NewHandler(usecase Usecase) *Handler {
+	return &Handler{
+		usecase: usecase,
+	}
+}
+
+func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseMultipartForm(30 << 20) // Максимальный размер файла 30 MB
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	file, handler, err := r.FormFile("file")
+	f, handler, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Error retrieving the file", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer f.Close()
 
 	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
 	fmt.Printf("File Size: %+v\n", handler.Size)
 	fmt.Printf("MIME Header: %+v\n", handler.Header)
 
-	dst, err := os.Create(handler.Filename)
+	err = h.usecase.Upload(r.Context(), file.File{
+		File:        f,
+		Filename:    handler.Filename,
+		Size:        handler.Size,
+		ContentType: handler.Header["Content-Type"][0],
+	})
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		w.WriteHeader(http.StatusInternalServerError)
 	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, file); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
+	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "File uploaded successfully: %s", handler.Filename)
+}
+
+func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
+	fileType := r.URL.Query().Get("type")
+	query := r.URL.Query().Get("query")
+
+	fmt.Printf("Search Query: %s, File Type: %s\n", query, fileType)
+
+	results, err := h.usecase.Search(r.Context(), file.SearchQuery{
+		Query: query,
+		Type:  fileType,
+	})
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	w.WriteHeader(http.StatusOK)
+
+	filenames := []string{}
+	for _, file := range results {
+		filenames = append(filenames, file.Filename)
+	}
+
+	response := struct {
+		Body []string `json:"body"`
+	}{
+		Body: filenames,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }

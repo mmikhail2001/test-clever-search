@@ -1,6 +1,6 @@
 package file
 
-type Search struct {
+type SearchQuery struct {
 	Query string
 	Type  string
 }
