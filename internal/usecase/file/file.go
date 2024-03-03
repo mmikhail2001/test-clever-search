@@ -22,9 +22,16 @@ func (uc *Usecase) Upload(ctx context.Context, file file.File) error {
 		return err
 	}
 	err = uc.repo.CreateFile(ctx, file)
+	if err != nil {
+		return err
+	}
+	err = uc.repo.PublishMessage(ctx, file)
+	if err != nil {
+		return err
+	}
 	return err
 }
 
-func (uc *Usecase) Search(ctx context.Context, search file.SearchQuery) ([]file.File, error) {
-	return uc.repo.Search(ctx, search)
+func (uc *Usecase) GetFiles(ctx context.Context, query string) ([]file.File, error) {
+	return uc.repo.GetFiles(ctx, query)
 }

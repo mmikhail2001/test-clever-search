@@ -8,10 +8,10 @@ import (
 	"github.com/mmikhail2001/test-clever-search/internal/repository/file"
 	"github.com/mmikhail2001/test-clever-search/pkg/client/minio"
 	"github.com/mmikhail2001/test-clever-search/pkg/client/mongo"
-
-	fileUsecase "github.com/mmikhail2001/test-clever-search/internal/usecase/file"
+	"github.com/mmikhail2001/test-clever-search/pkg/client/rabbitmq"
 
 	fileDelivery "github.com/mmikhail2001/test-clever-search/internal/delivery/file"
+	fileUsecase "github.com/mmikhail2001/test-clever-search/internal/usecase/file"
 )
 
 func main() {
@@ -32,13 +32,18 @@ func Run() error {
 		return err
 	}
 
-	fileRepo := file.NewRepository(minio, mongoDB)
+	channelRabbitMQ, err := rabbitmq.NewClient()
+	if err != nil {
+		return err
+	}
+
+	fileRepo := file.NewRepository(minio, mongoDB, channelRabbitMQ)
 	fileUsecase := fileUsecase.NewUsecase(fileRepo)
 	fileHandler := fileDelivery.NewHandler(fileUsecase)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", serveHome).Methods("GET")
-	r.HandleFunc("/search", fileHandler.Search).Methods("GET")
+	r.HandleFunc("/getfiles", fileHandler.GetFiles).Methods("GET")
 	r.HandleFunc("/upload", fileHandler.Upload).Methods("POST")
 	http.ListenAndServe(":8080", r)
 	return nil

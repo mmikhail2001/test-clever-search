@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Upload and Search</title>
 </head>
-<body>
+<body onload="loadFiles()">
     <input type="text" id="searchQuery" placeholder="Поиск...">
     <select id="fileType">
         <option value="video">Video</option>
@@ -14,23 +14,51 @@
         <option value="audio">Audio</option>
     </select>
     <button onclick="searchFiles()">Отправить</button>
+    <br><br>
     <input type="file" id="fileInput">
+    <input type="text" id="folderInput" placeholder="Директория">
     <button onclick="uploadFile()">Загрузить файл</button>
+    <br><br>
+    <h1>Файловая структура</h1>
+    <div id="fileStructure"></div>
+    <br><br>
+    <h1>Результаты поиска</h1>
     <div id="searchResults"></div>
     <br><br>
     <script>
+        function loadFiles() {
+            fetch(`/getfiles`)
+                .then(response => response.json())
+                .then(data => {
+                    const fileStructure = document.getElementById('fileStructure');
+                    fileStructure.innerHTML = ''; // Очищаем предыдущие результаты
+                    if (data.body && data.body.length > 0) {
+                        data.body.forEach(filename => {
+                            const trimmedFilename = filename.substring(filename.indexOf('test'));
+                            const div = document.createElement('div');
+                            div.textContent = trimURL(filename);
+                            fileStructure.appendChild(div);
+                        });
+                    } else {
+                        fileStructure.innerHTML = '<div>No files found</div>';
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
         function searchFiles() {
             const query = document.getElementById('searchQuery').value;
             const type = document.getElementById('fileType').value;
-            fetch(`/search?query=${query}&type=${type}`)
+            fetch(`/getfiles?query=${query}&type=${type}`)
                 .then(response => response.json())
                 .then(data => {
                     const results = document.getElementById('searchResults');
                     results.innerHTML = ''; // Очищаем предыдущие результаты
                     if (data.body && data.body.length > 0) {
                         data.body.forEach(filename => {
+                            const trimmedFilename = filename.substring(filename.indexOf('test'));
                             const div = document.createElement('div');
-                            div.textContent = filename;
+                            div.textContent = trimURL(filename);
                             results.appendChild(div);
                         });
                     } else {
@@ -43,7 +71,9 @@
         function uploadFile() {
             const formData = new FormData();
             const fileInput = document.getElementById('fileInput').files[0];
+            const folderInput = document.getElementById('folderInput').value;
             formData.append('file', fileInput);
+            formData.append('folder', folderInput);
 
             fetch('/upload', {
                 method: 'POST',
@@ -55,6 +85,11 @@
                 }
             })
             .catch(error => console.error('Error:', error));
+        }
+
+        function trimURL(url) {
+            const parts = url.split('/');
+            return parts.slice(4).join('/');
         }
     </script>
 </body>

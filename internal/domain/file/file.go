@@ -9,6 +9,7 @@ import (
 type File struct {
 	ID          uuid.UUID
 	Filename    string
+	Path        string
 	Size        int64
 	File        multipart.File
 	ContentType string

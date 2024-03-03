@@ -6,8 +6,8 @@ services:
     restart: always
     container_name: minio
     ports:
-      - "9000:9000"    # Port for MinIO Browser
-      - "9090:9090"    # Port for MinIO Console
+      - "9000:9000"
+      - "9090:9090" # web
     volumes:
       - minio_data:/data
     environment:
@@ -23,6 +23,18 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: PASSWORD
     ports:
       - 27018:27017
+    volumes:
+      - mongo_data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
 
 volumes:
   minio_data:
+  mongo_data:

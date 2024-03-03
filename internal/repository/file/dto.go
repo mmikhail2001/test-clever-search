@@ -9,3 +9,9 @@ type fileDTO struct {
 	Status      string `bson:"status"`
 	URL         string `bson:"url"`
 }
+
+type fileForQueueDTO struct {
+	ID          string `json:"id"`
+	URL         string `json:"url"`
+	ContentType string `json:"contentType"`
+}

@@ -8,5 +8,5 @@ import (
 
 type Usecase interface {
 	Upload(ctx context.Context, file file.File) error
-	Search(ctx context.Context, search file.SearchQuery) ([]file.File, error)
+	GetFiles(ctx context.Context, query string) ([]file.File, error)
 }

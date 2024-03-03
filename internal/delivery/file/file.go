@@ -32,6 +32,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
+	folder := r.FormValue("folder")
+
 	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
 	fmt.Printf("File Size: %+v\n", handler.Size)
 	fmt.Printf("MIME Header: %+v\n", handler.Header)
@@ -40,6 +42,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		File:        f,
 		Filename:    handler.Filename,
 		Size:        handler.Size,
+		Path:        folder + "/" + handler.Filename,
 		ContentType: handler.Header["Content-Type"][0],
 	})
 
@@ -50,31 +53,24 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "File uploaded successfully: %s", handler.Filename)
 }
 
-func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
-	fileType := r.URL.Query().Get("type")
+func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("query")
-
-	fmt.Printf("Search Query: %s, File Type: %s\n", query, fileType)
-
-	results, err := h.usecase.Search(r.Context(), file.SearchQuery{
-		Query: query,
-		Type:  fileType,
-	})
+	results, err := h.usecase.GetFiles(r.Context(), query)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	w.WriteHeader(http.StatusOK)
 
-	filenames := []string{}
+	URLs := []string{}
 	for _, file := range results {
-		filenames = append(filenames, file.Filename)
+		URLs = append(URLs, file.URL)
 	}
 
 	response := struct {
 		Body []string `json:"body"`
 	}{
-		Body: filenames,
+		Body: URLs,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
