@@ -2,7 +2,6 @@ package file
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"path/filepath"
 
@@ -34,58 +33,6 @@ func NewRepository(minio *minio.Client, mongo *mongo.Database, channelRabbitMQ *
 	}
 }
 
-// TODO:
-// можно в отдельной горутине загружать файл или несолько файлов (PutObject)
-// - minio.PutObjectOptions{ Progress : myreader } следить за состоянием
-// - уведомить клиента о том, что файл начал загружаться
-// - а до этого всего уже создать в mongo запись о том, что файл на загрузке в s3
-
-// можно не отвечать фронту, пока не загрузим файл PutObject
-func (r *Repository) Upload(ctx context.Context, file file.File) (file.File, error) {
-	objectName := file.Filename
-	info, err := r.minio.PutObject(ctx, bucketName, file.Path, file.File, file.Size, minio.PutObjectOptions{ContentType: file.ContentType})
-	if err != nil {
-		log.Println("Failed to PutObject minio:", err)
-		return file, err
-	}
-	log.Printf("Successfully uploaded %s of size %d\n", objectName, info.Size)
-	log.Printf("Full info %+v\n", info)
-
-	file.URL = "https://" + minioHost + "/" + bucketName + "/" + file.Path
-	file.ID = uuid.New()
-
-	return file, nil
-}
-
-func (r *Repository) PublishMessage(ctx context.Context, file file.File) error {
-	fileDTO := fileForQueueDTO{
-		ID:          file.ID.String(),
-		URL:         file.URL,
-		ContentType: file.ContentType,
-	}
-
-	fileJSON, err := json.Marshal(fileDTO)
-	if err != nil {
-		return err
-	}
-
-	err = r.channelRabbitMQ.Publish(
-		"",
-		channelName,
-		false,
-		false,
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        fileJSON,
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (r *Repository) CreateFile(ctx context.Context, file file.File) error {
 	dto := fileDTO{
 		ID:          file.ID.String(),
@@ -106,7 +53,7 @@ func (r *Repository) CreateFile(ctx context.Context, file file.File) error {
 	return nil
 }
 
-// обращение к сервису Поиска
+// TODO: обращение к сервису Поиска
 // тот отдаст ID в mongoDB
 // func (r *Repository) Search(ctx context.Context, query file.queryString) ([]file.File, error)
 

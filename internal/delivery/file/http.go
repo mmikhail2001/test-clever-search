@@ -19,7 +19,9 @@ func NewHandler(usecase Usecase) *Handler {
 }
 
 func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseMultipartForm(30 << 20) // Максимальный размер файла 30 MB
+	// TODO: это не работает
+	// смог загрузить файл 500 МБ
+	err := r.ParseMultipartForm(30 << 20)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -35,8 +37,6 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	folder := r.FormValue("folder")
 
 	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
-	fmt.Printf("File Size: %+v\n", handler.Size)
-	fmt.Printf("MIME Header: %+v\n", handler.Header)
 
 	err = h.usecase.Upload(r.Context(), file.File{
 		File:        f,
