@@ -23,7 +23,7 @@ func NewHandler(usecase Usecase) *Handler {
 	}
 }
 
-func (h *Handler) HandleConnectWS(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ConnectNotifications(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Error with HandleConnectWS:", err)

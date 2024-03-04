@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/mmikhail2001/test-clever-search/internal/domain/file"
 )
 
@@ -75,4 +76,21 @@ func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func (h *Handler) CompleteProcessingFile(w http.ResponseWriter, r *http.Request) {
+	uuidFileString := r.URL.Query().Get("file_uuid")
+	uuidFile, err := uuid.Parse(uuidFileString)
+	if err != nil {
+		fmt.Println(w, "Invalid UUID for request to CompleteML:", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	err = h.usecase.CompleteProcessingFile(r.Context(), uuidFile)
+	if err != nil {
+		fmt.Println(w, "CompleteProcessingFile error:", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

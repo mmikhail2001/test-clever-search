@@ -27,6 +27,12 @@ import (
 // контексты, таймауты
 
 // нужна заглушка для python ML, прочитывание сообщений, sleep, webhook
+// зачем UUID вообще конвертить в uuid.UUID
+// может статуса в бд числовыми сделать (а не строка?...) и еще нужно статусы синхронизовать с event
+
+// можно ли беку следить, как мл обрабатывает очередь ? нужно ли?
+// если в поле директории указать /dir, то 2024/03/04 21:49:12 Failed to PutObject minio: Object name contains unsupported characters.
+// - проблема в / в начале
 
 func main() {
 
@@ -64,8 +70,8 @@ func Run() error {
 	r.HandleFunc("/", serveHome).Methods("GET")
 	r.HandleFunc("/getfiles", fileHandler.GetFiles).Methods("GET")
 	r.HandleFunc("/upload", fileHandler.Upload).Methods("POST")
-	// TODO: назвать связано с notify
-	r.HandleFunc("/ws", notifyDelivery.HandleConnectWS).Methods("GET")
+	r.HandleFunc("/complete-ml", fileHandler.CompleteProcessingFile).Methods("GET")
+	r.HandleFunc("/ws", notifyDelivery.ConnectNotifications).Methods("GET")
 	http.ListenAndServe(":8080", r)
 	return nil
 }

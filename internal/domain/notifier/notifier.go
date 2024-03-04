@@ -3,9 +3,10 @@ package notifier
 import "github.com/gorilla/websocket"
 
 type Notify struct {
-	Event  string
-	UserID string
-	Data   map[string]string
+	Event string
+	// TODO: здесь string, а в file uuid.UUID
+	UserID  string
+	FileURL string
 }
 
 type Client struct {

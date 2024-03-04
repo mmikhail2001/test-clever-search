@@ -2,6 +2,8 @@ package file
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"path/filepath"
 
@@ -103,4 +105,52 @@ func (r *Repository) GetFiles(ctx context.Context, query string) ([]file.File, e
 	}
 
 	return results, nil
+}
+
+func (r *Repository) GetFileByID(ctx context.Context, uuidFile uuid.UUID) (file.File, error) {
+	var resultDTO fileDTO
+
+	filter := bson.M{"_id": uuidFile.String()}
+	err := r.mongo.Collection("files").FindOne(ctx, filter).Decode(&resultDTO)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return file.File{}, fmt.Errorf("GetFileByID no file with uuid: %w", err)
+		}
+		return file.File{}, err
+	}
+
+	parsedUUID, err := uuid.Parse(resultDTO.ID)
+	if err != nil {
+		return file.File{}, err
+	}
+
+	file := file.File{
+		ID:          parsedUUID,
+		Filename:    resultDTO.Filename,
+		Size:        resultDTO.Size,
+		ContentType: resultDTO.ContentType,
+		Status:      resultDTO.Status,
+		URL:         resultDTO.URL,
+	}
+
+	return file, nil
+}
+
+func (r *Repository) Update(ctx context.Context, file file.File) error {
+	uuidString := file.ID.String()
+	update := bson.M{
+		"$set": bson.M{
+			"filename": file.Filename,
+			"status":   file.Status,
+			"url":      file.URL,
+		},
+	}
+
+	filter := bson.M{"_id": uuidString}
+	_, err := r.mongo.Collection("files").UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update file: %w", err)
+	}
+
+	return nil
 }

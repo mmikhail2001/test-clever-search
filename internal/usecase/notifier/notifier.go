@@ -11,7 +11,8 @@ type Usecase struct {
 	newMessage chan notifier.Notify
 	register   chan *notifier.Client
 	unregister chan *notifier.Client
-	gate       Gateway
+
+	gate Gateway
 }
 
 var (
@@ -33,6 +34,10 @@ func NewUsecase(gate Gateway) *Usecase {
 	go usecase.run()
 	return usecase
 }
+
+// убрать всю логику с каналами, просто при регистрации нужно запомнить ws.conn
+// при необходимости что-то отправить, вызываем соответствующий метод
+// нет необходимости крутиться в горутине, чтобы в вечном цикле проверять ws на наличие сообщений на чтение
 
 // TODO: если канал занят, то плохо
 // нужен контекст с таймаутом
@@ -56,6 +61,9 @@ func (h *Usecase) run() {
 				close(client.Send)
 			}
 		case message := <-h.newMessage:
+			// TODO: ответ - ошибка
+			// убрать в метод Notify
+			// вместо client.Send <- message вызов метода gateway
 			if client, ok := h.clients[message.UserID]; ok {
 				select {
 				case client.Send <- message:
