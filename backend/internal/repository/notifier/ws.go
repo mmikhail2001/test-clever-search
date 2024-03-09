@@ -25,13 +25,19 @@ func (gw *Gateway) WriteLoop(client *notifier.Client) {
 			break
 		}
 
-		jsonMessage, err := json.Marshal(message)
+		messageDTO := NotifyDTO{
+			Event:  message.Event,
+			UserID: message.UserID,
+			S3URL:  message.S3URL,
+		}
+
+		jsonMsg, err := json.Marshal(messageDTO)
 		if err != nil {
 			log.Printf("Error on marshalling message: %v", err)
 			continue
 		}
 
-		if err := client.Conn.WriteMessage(websocket.TextMessage, jsonMessage); err != nil {
+		if err := client.Conn.WriteMessage(websocket.TextMessage, jsonMsg); err != nil {
 			log.Printf("Error on sending message: %v", err)
 			break
 		}

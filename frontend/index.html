@@ -4,10 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="./build/style.css">
     <title>File Upload and Search</title>
 </head>
 
-<body onload="loadFiles()">
+<body class="blue-backgraund" onload="loadFiles()">
     <input type="text" id="searchQuery" placeholder="Поиск...">
     <select id="fileType">
         <option value="video">Video</option>
@@ -29,7 +30,7 @@
     <br><br>
     <script>
         function loadFiles() {
-            fetch(`/getfiles`)
+            fetch(`/api/files`)
                 .then(response => response.json())
                 .then(data => {
                     const fileStructure = document.getElementById('fileStructure');
@@ -65,7 +66,7 @@
         function searchFiles() {
             const query = document.getElementById('searchQuery').value;
             const type = document.getElementById('fileType').value;
-            fetch(`/getfiles?query=${query}&type=${type}`)
+            fetch(`/api/files/search?query=${query}&type=${type}`)
                 .then(response => response.json())
                 .then(data => {
                     const results = document.getElementById('searchResults');
@@ -91,7 +92,7 @@
             formData.append('file', fileInput);
             formData.append('folder', folderInput);
 
-            fetch('/upload', {
+            fetch('/api/files/upload', {
                 method: 'POST',
                 body: formData,
             })

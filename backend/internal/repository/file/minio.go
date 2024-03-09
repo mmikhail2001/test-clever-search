@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 
-	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/mmikhail2001/test-clever-search/internal/domain/file"
 )
@@ -22,8 +21,6 @@ func (r *Repository) Upload(ctx context.Context, file file.File) (file.File, err
 		log.Println("Failed to PutObject minio:", err)
 		return file, err
 	}
-	file.URL = "https://" + minioHost + "/" + bucketName + "/" + file.Path
-	file.ID = uuid.New()
-
+	file.S3URL = "https://" + minioHost + "/" + bucketName + "/" + file.Path
 	return file, nil
 }

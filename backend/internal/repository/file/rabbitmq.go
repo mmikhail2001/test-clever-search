@@ -10,8 +10,8 @@ import (
 
 func (r *Repository) PublishMessage(ctx context.Context, file file.File) error {
 	fileDTO := fileForQueueDTO{
-		ID:          file.ID.String(),
-		URL:         file.URL,
+		ID:          file.ID,
+		S3URL:       file.S3URL,
 		ContentType: file.ContentType,
 	}
 

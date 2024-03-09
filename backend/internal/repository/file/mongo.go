@@ -7,7 +7,6 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/mmikhail2001/test-clever-search/internal/domain/file"
 	"github.com/streadway/amqp"
@@ -37,13 +36,18 @@ func NewRepository(minio *minio.Client, mongo *mongo.Database, channelRabbitMQ *
 
 func (r *Repository) CreateFile(ctx context.Context, file file.File) error {
 	dto := fileDTO{
-		ID:          file.ID.String(),
+		ID:          file.ID,
 		Filename:    file.Filename,
 		Size:        file.Size,
 		ContentType: file.ContentType,
 		Extension:   filepath.Ext(file.Filename),
-		Status:      "uploaded",
-		URL:         file.URL,
+		Status:      file.Status,
+		S3URL:       file.S3URL,
+		UserID:      file.UserID,
+		Path:        file.Path,
+		TimeCreated: file.TimeCreated,
+		IsDir:       file.IsDir,
+		IsShared:    file.IsShared,
 	}
 
 	collection := r.mongo.Collection("files")
@@ -55,19 +59,14 @@ func (r *Repository) CreateFile(ctx context.Context, file file.File) error {
 	return nil
 }
 
-// TODO: обращение к сервису Поиска
-// тот отдаст ID в mongoDB
-// func (r *Repository) Search(ctx context.Context, query file.queryString) ([]file.File, error)
-
-func (r *Repository) GetFiles(ctx context.Context, query string) ([]file.File, error) {
-	var resultsDTO []fileDTO
-
+func (r *Repository) Search(ctx context.Context, fileOptions file.FileOptions) ([]file.File, error) {
 	filter := bson.M{}
-	if query != "" {
-		filter["filename"] = bson.M{"$regex": primitive.Regex{Pattern: query, Options: "i"}}
+	if fileOptions.Query != "" {
+		filter["filename"] = bson.M{"$regex": primitive.Regex{Pattern: fileOptions.Query, Options: "i"}}
 	}
 
-	opts := options.Find().SetSort(bson.D{{"filename", 1}})
+	opts := options.Find().SetSort(bson.D{{Key: "filename", Value: 1}})
+	opts = opts.SetLimit(int64(fileOptions.Limit)).SetSkip(int64(fileOptions.Offset))
 
 	cursor, err := r.mongo.Collection("files").Find(ctx, filter, opts)
 	if err != nil {
@@ -75,6 +74,7 @@ func (r *Repository) GetFiles(ctx context.Context, query string) ([]file.File, e
 	}
 	defer cursor.Close(ctx)
 
+	var resultsDTO []fileDTO
 	for cursor.Next(ctx) {
 		var dto fileDTO
 		err := cursor.Decode(&dto)
@@ -86,17 +86,19 @@ func (r *Repository) GetFiles(ctx context.Context, query string) ([]file.File, e
 
 	results := make([]file.File, len(resultsDTO))
 	for i, fileDTO := range resultsDTO {
-		uuid, err := uuid.Parse(fileDTO.ID)
-		if err != nil {
-			return nil, err
-		}
 		results[i] = file.File{
-			ID:          uuid,
+			ID:          fileDTO.ID,
 			Filename:    fileDTO.Filename,
 			Size:        fileDTO.Size,
 			ContentType: fileDTO.ContentType,
 			Status:      fileDTO.Status,
-			URL:         fileDTO.URL,
+			S3URL:       fileDTO.S3URL,
+			TimeCreated: fileDTO.TimeCreated,
+			UserID:      fileDTO.UserID,
+			Path:        fileDTO.Path,
+			IsDir:       fileDTO.IsDir,
+			IsShared:    fileDTO.IsShared,
+			Extension:   fileDTO.Extension,
 		}
 	}
 
@@ -107,10 +109,73 @@ func (r *Repository) GetFiles(ctx context.Context, query string) ([]file.File, e
 	return results, nil
 }
 
-func (r *Repository) GetFileByID(ctx context.Context, uuidFile uuid.UUID) (file.File, error) {
+func (r *Repository) GetFiles(ctx context.Context, fileOptions file.FileOptions) ([]file.File, error) {
+	filter := bson.M{}
+	if fileOptions.FileType != file.AllTypes {
+		filter["content_type"] = string(fileOptions.FileType)
+	}
+
+	if fileOptions.Dir != "all" {
+		filter["path"] = fileOptions.Dir
+	}
+
+	if fileOptions.Shared {
+		filter["is_shared"] = true
+	}
+
+	if fileOptions.Disk != "all" {
+		filter["disk"] = fileOptions.Disk
+	}
+
+	// сортировка нужна по дате добавления
+	opts := options.Find().SetSort(bson.D{{Key: "filename", Value: 1}})
+	opts = opts.SetLimit(int64(fileOptions.Limit)).SetSkip(int64(fileOptions.Offset))
+
+	cursor, err := r.mongo.Collection("files").Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var resultsDTO []fileDTO
+	for cursor.Next(ctx) {
+		var dto fileDTO
+		err := cursor.Decode(&dto)
+		if err != nil {
+			return nil, err
+		}
+		resultsDTO = append(resultsDTO, dto)
+	}
+
+	results := make([]file.File, len(resultsDTO))
+	for i, fileDTO := range resultsDTO {
+		results[i] = file.File{
+			ID:          fileDTO.ID,
+			Filename:    fileDTO.Filename,
+			Size:        fileDTO.Size,
+			ContentType: fileDTO.ContentType,
+			Status:      fileDTO.Status,
+			S3URL:       fileDTO.S3URL,
+			TimeCreated: fileDTO.TimeCreated,
+			UserID:      fileDTO.UserID,
+			Path:        fileDTO.Path,
+			IsDir:       fileDTO.IsDir,
+			IsShared:    fileDTO.IsShared,
+			Extension:   fileDTO.Extension,
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+func (r *Repository) GetFileByID(ctx context.Context, uuidFile string) (file.File, error) {
 	var resultDTO fileDTO
 
-	filter := bson.M{"_id": uuidFile.String()}
+	filter := bson.M{"_id": uuidFile}
 	err := r.mongo.Collection("files").FindOne(ctx, filter).Decode(&resultDTO)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -118,35 +183,28 @@ func (r *Repository) GetFileByID(ctx context.Context, uuidFile uuid.UUID) (file.
 		}
 		return file.File{}, err
 	}
-
-	parsedUUID, err := uuid.Parse(resultDTO.ID)
-	if err != nil {
-		return file.File{}, err
-	}
-
 	file := file.File{
-		ID:          parsedUUID,
+		ID:          resultDTO.ID,
 		Filename:    resultDTO.Filename,
 		Size:        resultDTO.Size,
 		ContentType: resultDTO.ContentType,
 		Status:      resultDTO.Status,
-		URL:         resultDTO.URL,
+		S3URL:       resultDTO.S3URL,
 	}
 
 	return file, nil
 }
 
 func (r *Repository) Update(ctx context.Context, file file.File) error {
-	uuidString := file.ID.String()
 	update := bson.M{
 		"$set": bson.M{
 			"filename": file.Filename,
 			"status":   file.Status,
-			"url":      file.URL,
+			"url_s3":   file.S3URL,
 		},
 	}
 
-	filter := bson.M{"_id": uuidString}
+	filter := bson.M{"_id": file.ID}
 	_, err := r.mongo.Collection("files").UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("failed to update file: %w", err)
